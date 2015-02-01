@@ -114,6 +114,7 @@ namespace kinect
                             if (LeftFootPoints.Count < NumberOfFramesToAverage)
                             {
                                 // Add the frame without doing any calculations
+                                body.Joints[JointType.FootLeft].
                                 LeftFootPoints.Enqueue(body.Joints[JointType.FootLeft].Position);
                                 RightFootPoints.Enqueue(body.Joints[JointType.FootRight].Position);
                             }
