@@ -1,8 +1,0 @@
-﻿<Window x:Class="kinect.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MainWindow" Height="640" Width="480">
-    <Grid>
-        <TextBlock Name="Output" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top"/>
-    </Grid>
-</Window>

@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Net;
 using Microsoft.Kinect;
 
 namespace kinect
@@ -41,6 +38,11 @@ namespace kinect
             float yError = (b.Y - a.Y);
             float zError = (b.Z - a.Z);
             return Math.Max(xError, Math.Max(yError, zError));
+        }
+
+        public static int GetArrowsPressed(CameraSpacePoint upArrow, CameraSpacePoint rightArrow, CameraSpacePoint downArrow, CameraSpacePoint leftArrow, CameraSpacePoint leftFoot, CameraSpacePoint rightFoot)
+        {
+            throw new NotImplementedException();
         }
     }
 }

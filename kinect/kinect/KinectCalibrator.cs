@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using Microsoft.Kinect;
@@ -9,7 +8,7 @@ namespace kinect
     /// <summary>
     /// Used for tuning the dance pad, getting the initial locations of down, up, left and right.
     /// </summary>
-    public class KinectCalibrator : IDisposable
+    public class KinectCalibrator
     {
         protected const int NumberOfFramesToAverage = 150;
         protected const float MaximumError = 0.01f;
@@ -49,6 +48,9 @@ namespace kinect
 
             // Wait for calibration to finish
             CalibrationFinished.WaitOne();
+
+            BodyFrameReader.FrameArrived -= ParseFrame;
+            BodyFrameReader.Dispose();
         }
 
         private void ParseFrame(object sender, BodyFrameArrivedEventArgs bodyFrameArrivedEventArgs)
@@ -179,14 +181,6 @@ namespace kinect
                     }
                 }
             }
-        }
-        public void Dispose()
-        {
-            // Remove event
-            BodyFrameReader.FrameArrived -= ParseFrame;
-
-            // Close Body Frame Reader
-            BodyFrameReader.Dispose();
         }
     }
 }
