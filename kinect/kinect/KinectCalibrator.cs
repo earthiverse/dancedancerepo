@@ -19,16 +19,17 @@ namespace kinect
         protected ulong TrackingID;
         public CameraSpacePoint LeftFoot;
         public CameraSpacePoint RightFoot;
+        public CameraSpacePoint Center;
 
         protected Body[] Bodies;
 
         public KinectSensor Kinect;
-        protected BodyFrameReader BodyFrameReader;
+        public BodyFrameReader BodyFrameReader;
 
         protected Queue<CameraSpacePoint> LeftFootPoints;
         protected Queue<CameraSpacePoint> RightFootPoints;
 
-        public KinectCalibrator()
+        public KinectCalibrator(BodyFrameReader reader = null)
         {
             CalibrationFinished = new ManualResetEvent(false);
             Kinect = KinectSensor.GetDefault();
@@ -36,11 +37,11 @@ namespace kinect
             LeftFootPoints = new Queue<CameraSpacePoint>(NumberOfFramesToAverage);
             RightFootPoints = new Queue<CameraSpacePoint>(NumberOfFramesToAverage);
 
+            // Setup the kinect to read the skeletons
+            BodyFrameReader = reader ?? Kinect.BodyFrameSource.OpenReader();
+
             Thread thread = new Thread(() =>
             {
-                // Setup the kinect to read the skeletons
-                BodyFrameReader = Kinect.BodyFrameSource.OpenReader();
-
                 // Setup averaging
                 BodyFrameReader.FrameArrived += ParseFrame;
             });
@@ -48,9 +49,9 @@ namespace kinect
 
             // Wait for calibration to finish
             CalibrationFinished.WaitOne();
+            thread.Join();
 
             BodyFrameReader.FrameArrived -= ParseFrame;
-            BodyFrameReader.Dispose();
         }
 
         private void ParseFrame(object sender, BodyFrameArrivedEventArgs bodyFrameArrivedEventArgs)
@@ -173,6 +174,8 @@ namespace kinect
                                     break;
                                 }
                                 RightFoot = averagePoint;
+
+                                Center = body.Joints[JointType.SpineBase].Position;
 
                                 // Calibration is within error!
                                 CalibrationFinished.Set();
