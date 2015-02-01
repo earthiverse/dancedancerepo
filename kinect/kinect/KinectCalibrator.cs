@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Diagnostics;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Kinect;
 
 namespace kinect
@@ -13,31 +11,44 @@ namespace kinect
     /// </summary>
     public class KinectCalibrator : IDisposable
     {
+        protected const int NumberOfFramesToAverage = 150;
+        protected const float MaximumError = 0.01f;
+
         public ManualResetEvent CalibrationFinished;
 
-        protected uint FrameNo = 1;
+        protected uint FrameNo;
         protected ulong TrackingID;
-        protected CameraSpacePoint LeftFoot;
-        protected CameraSpacePoint RightFoot;
+        public CameraSpacePoint LeftFoot;
+        public CameraSpacePoint RightFoot;
 
         protected Body[] Bodies;
+
+        public KinectSensor Kinect;
+        protected BodyFrameReader BodyFrameReader;
+
+        protected Queue<CameraSpacePoint> LeftFootPoints;
+        protected Queue<CameraSpacePoint> RightFootPoints;
 
         public KinectCalibrator()
         {
             CalibrationFinished = new ManualResetEvent(false);
+            Kinect = KinectSensor.GetDefault();
+            Bodies = new Body[Kinect.BodyFrameSource.BodyCount];
+            LeftFootPoints = new Queue<CameraSpacePoint>(NumberOfFramesToAverage);
+            RightFootPoints = new Queue<CameraSpacePoint>(NumberOfFramesToAverage);
 
-            // Find the connected Kinect
-            KinectSensor kinect = KinectSensor.GetDefault();
-
-            // Setup the kinect to read the skeletons
-            using (BodyFrameReader reader = kinect.BodyFrameSource.OpenReader())
+            Thread thread = new Thread(() =>
             {
-                // Setup averaging
-                reader.FrameArrived += ParseFrame;
+                // Setup the kinect to read the skeletons
+                BodyFrameReader = Kinect.BodyFrameSource.OpenReader();
 
-                // Wait for calibration to finish
-                CalibrationFinished.WaitOne();
-            }
+                // Setup averaging
+                BodyFrameReader.FrameArrived += ParseFrame;
+            });
+            thread.Start();
+
+            // Wait for calibration to finish
+            CalibrationFinished.WaitOne();
         }
 
         private void ParseFrame(object sender, BodyFrameArrivedEventArgs bodyFrameArrivedEventArgs)
@@ -56,7 +67,19 @@ namespace kinect
                         {
                             if (TrackingID == 0)
                             {
-                                // Start tracking!
+                                // Verify there is only one person in front of the Kinect to start
+                                foreach (Body body2 in Bodies)
+                                {
+                                    if (body2 == body)
+                                        // Same body
+                                        continue;
+
+                                    if (body2.IsTracked)
+                                        // Multiple users in the first frame, don't start calibrating until one moves out
+                                        break;
+                                }
+
+                                // Start tracking this body!
                                 TrackingID = body.TrackingId;
                             }
                             else if (TrackingID != body.TrackingId)
@@ -65,7 +88,11 @@ namespace kinect
                                 bool verifiedStillVisible = false;
                                 foreach (Body body2 in Bodies)
                                 {
-                                    if (body2.TrackingId == TrackingID)
+                                    if (body2 == body)
+                                        // Same body
+                                        continue;
+
+                                    if (body2.IsTracked && body2.TrackingId == TrackingID)
                                     {
                                         // There's multiple people
                                         verifiedStillVisible = true;
@@ -75,11 +102,78 @@ namespace kinect
                                 if (!verifiedStillVisible)
                                 {
                                     // Restart calibration
-                                    FrameNo = 1;
-                                    LeftFoot = body.Joints[JointType.FootLeft].Position;
-                                    RightFoot = body.Joints[JointType.FootRight].Position;
+                                    FrameNo = 0;
+                                    TrackingID = 0;
                                     break;
                                 }
+                            }
+
+                            if (LeftFootPoints.Count < NumberOfFramesToAverage)
+                            {
+                                // Add the frame without doing any calculations
+                                LeftFootPoints.Enqueue(body.Joints[JointType.FootLeft].Position);
+                                RightFootPoints.Enqueue(body.Joints[JointType.FootRight].Position);
+                            }
+                            else if (LeftFootPoints.Count == NumberOfFramesToAverage)
+                            {
+                                // See if the last 5 seconds are somewhat the same
+
+                                // Average the left foot
+                                CameraSpacePoint firstPoint = LeftFootPoints.Peek();
+                                CameraSpacePoint averagePoint = firstPoint;
+                                uint i = 2;
+                                foreach (CameraSpacePoint leftFootPoint in LeftFootPoints)
+                                {
+                                    averagePoint = KinectHelper.Average2CameraSpacePoints(averagePoint, leftFootPoint, i);
+                                    i++;
+                                }
+
+                                float error = KinectHelper.MaxDifference(averagePoint, firstPoint);
+                                if (error > MaximumError)
+                                {
+                                    Debug.WriteLine("Left Foot Error: {0}", error);
+                                    Debug.WriteLine("Left Foot Average: {0}, {1}, {2}", averagePoint.X, averagePoint.Y, averagePoint.Z);
+                                    Debug.WriteLine("Left Foot Last: {0}, {1}, {2}", firstPoint.X, firstPoint.Y, firstPoint.Z);
+
+                                    // Too much error detected, remove half of the frames
+                                    for (int j = 0; j < NumberOfFramesToAverage / 2; j++)
+                                    {
+                                        LeftFootPoints.Dequeue();
+                                        RightFootPoints.Dequeue();
+                                    }
+                                    break;
+                                }
+                                LeftFoot = averagePoint;
+
+                                // Check the right foot
+                                firstPoint = RightFootPoints.Peek();
+                                averagePoint = firstPoint;
+                                i = 2;
+                                foreach (CameraSpacePoint rightFootPoint in RightFootPoints)
+                                {
+                                    averagePoint = KinectHelper.Average2CameraSpacePoints(averagePoint, rightFootPoint, i);
+                                    i++;
+                                }
+
+                                error = KinectHelper.MaxDifference(averagePoint, firstPoint);
+                                if (error > MaximumError)
+                                {
+                                    Debug.WriteLine("Right Foot Error: {0}", error);
+                                    Debug.WriteLine("Right Foot Average: {0}, {1}, {2}", averagePoint.X, averagePoint.Y, averagePoint.Z);
+                                    Debug.WriteLine("Right Foot Last: {0}, {1}, {2}", firstPoint.X, firstPoint.Y, firstPoint.Z);
+
+                                    // Too much error detected, remove half of the frames
+                                    for (int j = 0; j < NumberOfFramesToAverage / 2; j++)
+                                    {
+                                        LeftFootPoints.Dequeue();
+                                        RightFootPoints.Dequeue();
+                                    }
+                                    break;
+                                }
+                                RightFoot = averagePoint;
+
+                                // Calibration is within error!
+                                CalibrationFinished.Set();
                             }
                         }
                     }
@@ -88,7 +182,11 @@ namespace kinect
         }
         public void Dispose()
         {
-            throw new NotImplementedException();
+            // Remove event
+            BodyFrameReader.FrameArrived -= ParseFrame;
+
+            // Close Body Frame Reader
+            BodyFrameReader.Dispose();
         }
     }
 }

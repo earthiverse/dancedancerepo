@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,14 +15,32 @@ namespace kinect
         /// </summary>
         /// <param name="a">Point A</param>
         /// <param name="b">Point B</param>
+        /// <param name="influence">Point B will be divided by this number, </param>
         /// <returns>An average of A and B</returns>
-        public static CameraSpacePoint Average2CameraSpacePoints(CameraSpacePoint a, CameraSpacePoint b)
+        public static CameraSpacePoint Average2CameraSpacePoints(CameraSpacePoint a, CameraSpacePoint b, uint influence = 2)
         {
-            CameraSpacePoint c = new CameraSpacePoint();
-            c.X = (a.X + b.X) / 2;
-            c.Y = (a.Y + b.Y) / 2;
-            c.Z = (a.Z + b.Z) / 2;
-            return c;
+            Contract.Requires(influence >= 2);
+
+            return new CameraSpacePoint
+            {
+                X = (a.X + ((b.X - a.X) / influence)),
+                Y = (a.Y + ((b.Y - a.Y) / influence)),
+                Z = (a.Z + ((b.Z - a.Z) / influence))
+            };
+        }
+
+        /// <summary>
+        /// Returns the maximum error between points A and B as a percent
+        /// </summary>
+        /// <param name="a">Point A</param>
+        /// <param name="b">Point B</param>
+        /// <returns>Maximum Error</returns>
+        public static float MaxDifference(CameraSpacePoint a, CameraSpacePoint b)
+        {
+            float xError = (b.X - a.X);
+            float yError = (b.Y - a.Y);
+            float zError = (b.Z - a.Z);
+            return Math.Max(xError, Math.Max(yError, zError));
         }
     }
 }
