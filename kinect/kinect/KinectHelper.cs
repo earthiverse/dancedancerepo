@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
-using System.Net;
-using System.Threading;
-using WindowsInput;
-using WindowsInput.Native;
 using Microsoft.Kinect;
 
 namespace kinect
 {
     public class KinectHelper
     {
+        // Difference in depth to trigger if a button is pressed
+        public const int DepthThreshold = 30;
+
         /// <summary>
         /// Average two camera space points to return the average position in the x, y and z axes
         /// </summary>
@@ -170,9 +169,61 @@ namespace kinect
                 }
             }
 
-            //Thread.Sleep(1000 / 31);
-            Thread.Sleep(10);
             return arrowsPressed;
+        }
+
+        public class Depths
+        {
+            public ushort UpDepth;
+            public ushort RightDepth;
+            public ushort DownDepth;
+            public ushort LeftDepth;
+            public ushort CenterDepth;
+        }
+
+        /// <summary>
+        /// Assumes that the Kinect is in front of the DDR pad, on the right (pointing to the DDR pad diagonally)
+        /// </summary>
+        /// <param name="averageDepths">Average depths for the various points</param>
+        /// <param name="lastDepths">The last depths measured for the various points</param>
+        /// <returns></returns>
+        public static Arrows GetArrowsPressed(Depths averageDepths, Depths lastDepths)
+        {
+            bool upTriggered = averageDepths.UpDepth - lastDepths.UpDepth > DepthThreshold;
+            bool rightTriggered = averageDepths.RightDepth - lastDepths.RightDepth > DepthThreshold;
+            bool downTriggered = averageDepths.DownDepth - lastDepths.DownDepth > DepthThreshold;
+            bool leftTriggered = averageDepths.LeftDepth - lastDepths.LeftDepth > DepthThreshold;
+            bool centerTriggered = averageDepths.CenterDepth - lastDepths.CenterDepth > DepthThreshold;
+
+            Arrows arrows = Arrows.None;
+            if (upTriggered)
+            {
+                // Up arrow is pressed
+                arrows = arrows | Arrows.Up;
+            }
+            if (rightTriggered)
+            {
+                // Right arrow is pressed
+                arrows = arrows | Arrows.Right;
+            }
+
+            if (arrows.HasFlag(Arrows.Up) && arrows.HasFlag(Arrows.Right))
+                // No other possibility, assuming some things (no hand presses, kinect in front right)
+                return arrows;
+
+            if (downTriggered)
+                arrows = arrows | Arrows.Down;
+
+            if ((arrows.HasFlag(Arrows.Up) && arrows.HasFlag(Arrows.Down)) || (arrows.HasFlag(Arrows.Down) && arrows.HasFlag(Arrows.Left)))
+                // No other possibility, asuming some things (no hand presses, kinect in front right)
+                return arrows;
+
+            if (leftTriggered)
+                arrows = arrows | Arrows.Left;
+            // Assume
+            if (upTriggered && !downTriggered && !centerTriggered && !rightTriggered)
+                arrows = arrows | Arrows.Left;
+            return arrows;
         }
     }
 }

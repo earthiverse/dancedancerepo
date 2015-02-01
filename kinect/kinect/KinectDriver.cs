@@ -1,11 +1,7 @@
-﻿using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
 using System.Threading;
 using System.Windows.Forms;
 using WindowsInput;
-using WindowsInput.Native;
-using InputManager;
 using Microsoft.Kinect;
 
 namespace kinect

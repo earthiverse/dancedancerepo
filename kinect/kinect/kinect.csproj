@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="KinectCalibrator.cs" />
+    <Compile Include="KinectDepthDriver.cs" />
     <Compile Include="KinectDriver.cs" />
     <Compile Include="KinectHelper.cs" />
     <Compile Include="Program.cs" />
